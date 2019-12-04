@@ -54,13 +54,11 @@ We could create a `variable` "timestep bitten" which is -1 when not and 1 when a
 Possibly the data. This would mean I need vector based parameters
 
 *What are the limits of creating process functions in this way*
+
 *What are the redundant computations?*
+
   * Low density areas
   * Variables calculated for every individual at every time (why not lazy?)
-
-*Are parameter structures necessary? Do you want to explore ranges?*
-
-Not for an R version. They overcomplicate things. Let's remove them.
 
 *How many mosquitoes/humans do we expect to model?*
 
@@ -88,7 +86,11 @@ Is it ok for it to be another state?
 *Where are the performance improvements?*
 
 Perhaps variable updates?
+
 Perhaps the simulation loop? (doubtful)
+
 Perhaps the variable/process functions?
+
 Parallelisation
+
 Distribution for memory usage

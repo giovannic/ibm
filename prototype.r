@@ -32,10 +32,10 @@ states <- c(
 )
 
 #Define variables
-pre_erythrocytic_immunity <- create_variable(human, "Ib", 0, function() {}) #TODO, how do I write this?
-initial_age               <- create_constant(human, "initial_age", runif(length(human), 0, 30))
+last_bitten <- create_variable(human, "last_bitten", 0, function() {}) #TODO, how do I write this?
+initial_age <- create_constant(human, "initial_age", runif(length(human), 0, 30))
 
-variables = c(pre_erytrocytic_immunity)
+variables = c(last_bitten)
 constants = c(initial_age)
 
 #Define parameters
@@ -43,6 +43,11 @@ b0  <- 0.590076
 b1  <- 0.5
 Ibo <- 43.8787
 kb  <- 2.15506
+rd  <- 1/5
+ra  <- 1/195
+ru  <- 1/110
+rt  <- 1/5
+ft  <- 1/2 #What to set??
 
 # Process functions return a vector of individuals to transfer given the model state
 # The first argument is an object exposing the individuals of the source state
@@ -51,37 +56,43 @@ kb  <- 2.15506
 #   get_constant
 #   get_variable
 # The second argument is the timestep of the simulation
-#TODO: not finished
 infection_function <- function(susceptable, timestep) {
   age <- susceptable$get_constant(initial_age) + timestep / 365
-  unique_biting_rate <- 1 - rho * exp(-age/a0)
-  EIR <- 1 #some kind of function of time?
-  prob_bitten <- unique_biting_rate * EIR
-  prob_develop <- b0 * 
-    (
-      b1 +
-      (1 - b1)/
-      1 + (susceptable$get_variable(pre_erythocytic_immunity)/Ibo)**kb
-    )
-  p <- prob_bitten * prob_develop
+  labmda = force_of_infection(age, timestep)
+  phi = immunity(age, susceptable$get_variable(last_bitten))
   random <- runif(length(susceptable), 0, 1)
-  return random > p
+  return random > (lambda * phi)
 }
 
-immunity <- function(last_bitten, age) {
-  #Calculate acquired immunity from last_bitten
-  #Calculate and maternal immunity from age
-  #Then calculate immunity using parameters
-  #TODO: implement
-  return rep(1, length(last_bitten))
+untreated_progression_function <- function(infected, timestep) {
+  random <- runif(length(infected), 0, 1)
+  return random > (1 - ft)
 }
+
+treatment_function <- function(infected, timestep) {
+  random <- runif(length(infected), 0, 1)
+  # are these always uniform distribution? If so, it could become part of the simulation
+  return random > ft
+}
+
+asymptomatic_progression_function <- function(diseased, timestep) {
+  random <- runif(length(diseased), 0, 1)
+  # are these always uniform distribution? If so, it could become part of the simulation
+  return random > rd
+}
+
+#Other functions...
 
 #Define processes
 processes <- c(
-  create_process("Infection", S, I, infection_function)
+  create_process("Infection", S, I, infection_function),
+  create_process("Untreated Progression", I, D, untreated_progression_function),
+  create_process("Treatment", I, Treated, treatment_function)
+  create_process("Asymptomatic Progression", D, A, asymptomatic_progression_function)
+  #Other processes... 
 )
 
-#TODO: try a mosquito
+#TODO: add mosquito processes
 
 simulation <- simulate(
   individuals,
@@ -91,3 +102,24 @@ simulation <- simulate(
   processes,
   365*10 # 10 years
 )
+
+
+#=================
+#Utility functions
+#=================
+force_of_infection <- function(age, timestep) {
+  #Calculate the unique biting rate (psi) from age
+  #Calculate the mean EIR (epsilon0) from time (how??)
+  #Sample the relative biting rate (xi) from a normal distribution
+  #Calculate immunity level (b) (why?? isn't this part of phi?)
+  #TODO: implement
+  return rep(1, length(timestep_last_bitten))
+}
+
+immunity <- function(age, timestep_last_bitten) {
+  #Calculate acquired immunity from last_bitten
+  #Calculate and maternal immunity from age
+  #Then calculate immunity using parameters
+  #TODO: implement
+  return rep(1, length(timestep_last_bitten))
+}

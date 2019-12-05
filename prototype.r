@@ -113,7 +113,7 @@ force_of_infection <- function(age, timestep) {
   #Sample the relative biting rate (xi) from a normal distribution
   #Calculate immunity level (b) (why?? isn't this part of phi?)
   #TODO: implement
-  return rep(1, length(timestep_last_bitten))
+  return rep(1, length(timestep))
 }
 
 immunity <- function(age, timestep_last_bitten) {

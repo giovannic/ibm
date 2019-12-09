@@ -4,8 +4,9 @@ package(dployr)
 # Human functions
 # ===============
 
+# Implemented from Winskill 2017 - Supplementary Information page 3
 # Calculate the unique biting rate (psi) from age
-# Calculate the mean EIR (epsilon0) from time (how??)
+# Calculate the mean EIR (epsilon0) from time
 # Sample the relative biting rate (xi) from a normal distribution
 # Calculate immunity level (b)
 force_of_infection <- function(
@@ -14,12 +15,11 @@ force_of_infection <- function(
   xi,
   mosquito_state,
   ib,
-  timestep,
   parameters
   ) {
 
   psi <- unique_biting_rate(age)
-  _pi <- (xi * psi) / sum(xi * psi)
+  _pi <- human_pi(xi, psi)
 
   # Prepare mosquito frame
   mosquito_frame <- data.frame(variant=v, state=mosquito_state)
@@ -35,12 +35,17 @@ force_of_infection <- function(
   return epsilon0 * xi * b * psi
 }
 
-immunity <- function(age, timestep_last_bitten) {
-  # Calculate acquired immunity from last_bitten
-  # Calculate and maternal immunity from age
-  # Then calculate immunity using parameters
-  #TODO: implement
-  return rep(1, length(timestep_last_bitten))
+# Implemented from Winskill 2017 - Supplementary Information page 4
+# Calculate acquired immunity from last_bitten
+# Calculate and maternal immunity from age
+# Then calculate immunity using parameters
+immunity <- function(acquired_immunity, maternal_immunity, parameters) {
+  return parameters$phi0 * (
+    parameters$phi1 +
+      (1 - parameters$phi1) /
+      1 + ((acquired_immunity + maternal_immunity) / parameters$ic0)
+      ** parameters$kc
+    )
 }
 
 # Unique biting rate (psi) for a human of a given age
@@ -58,13 +63,16 @@ infection_probability <- function(ib, parameters) {
     (1 + (ib / parameters$ib0)**parameters$kb)
 }
 
+human_pi <- function(xi, psi) {
+ (xi * psi) / sum(xi * psi)
+}
+
 # ==================
 # Mosquito functions
 # ==================
 
-# Implementd from Griffin et al 2010 S1 page 6 (should it be page 7?)
-# TODO: change to page 7 formulation
-mosquito_force_of_infection <- function(v, age, state, xi, timestep, parameters) {
+# Implemented from Griffin et al 2010 S1 page 7
+mosquito_force_of_infection <- function(v, age, state, xi, parameters) {
 
   # Prepare data frame
   human_frame <- data.frame(
@@ -72,10 +80,9 @@ mosquito_force_of_infection <- function(v, age, state, xi, timestep, parameters)
     "state" = state
     "xi" = xi
   )
-
-  summary <- human_frame %>% group_by(.dots=c("state", "age", "xi")) %>% tally()
-
-  summary$infectivity = recode(
+  human_frame$psi <- unique_biting_rate(human_frame$age)
+  human_frame$pi <- human_pi(human_frame$xi, human_frame$psi)
+  human_frame$infectivity = recode(
     human_frame$state,
     D=parameters$cd,
     Treated=parameters$ct,
@@ -83,17 +90,8 @@ mosquito_force_of_infection <- function(v, age, state, xi, timestep, parameters)
     U=parameters$cu
   )
 
-  summary$psi <- unique_biting_rate(summary$age) * summary$xi
-
-  #Calculate integral
-  integral = sum(summary$xi * summary$psi * summary$infectivity * summary$n)
-
-  # Calculate normaliser
-  age_distribution <- human_frame %>% groupby("age") %>% tally()
-  age_distribution$p <- age_distribution$n / length(human_frame)
-  omega <- sum(age_distribution$p * unique_biting_rate(age_distribution$age))
-
-  return (blood_meal_rate(v, parameters) / omega) * integral
+  mean_infectivity <- sum(human_frame$pi * human_frame$infectivity)
+  return blood_meal_rate(v, parameters) * mean_infectivity
 }
 
 blood_meal_rate <- function(v, parameters) {

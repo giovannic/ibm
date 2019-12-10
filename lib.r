@@ -23,6 +23,10 @@ create_process <- function(name, from, to, rate) {
   return list(name=name, from=from, to=to, rate=rate)
 }
 
+create_interval_updater <- function(updater, interval) {
+  return list(updater=updater, interval=interval)
+}
+
 simulate <- function(individuals, states, constants, variables, processes, end_time) {
   #...
 }

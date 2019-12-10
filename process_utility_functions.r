@@ -59,7 +59,7 @@ relative_biting_rate <- function(n, parameters) {
 }
 
 infection_probability <- function(ib, parameters) {
-  return parameters$bmin + (parameters$bmax - parameters$bmin) /
+  return parameters$b0 + (parameters$b1 - parameters$b0) /
     (1 + (ib / parameters$ib0)**parameters$kb)
 }
 

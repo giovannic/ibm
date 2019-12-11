@@ -32,7 +32,7 @@ force_of_infection <- function(
 
   epsilon0 <- _pi * sum(infectious_count$blood_meal_rate * infectious_count$n)
   b <- infection_probability(ib, parameters)
-  return epsilon0 * xi * b * psi
+  epsilon0 * xi * b * psi
 }
 
 # Implemented from Winskill 2017 - Supplementary Information page 4
@@ -40,7 +40,7 @@ force_of_infection <- function(
 # Calculate and maternal immunity from age
 # Then calculate immunity using parameters
 immunity <- function(acquired_immunity, maternal_immunity, parameters) {
-  return parameters$phi0 * (
+  parameters$phi0 * (
     parameters$phi1 +
       (1 - parameters$phi1) /
       1 + ((acquired_immunity + maternal_immunity) / parameters$ic0)
@@ -50,16 +50,16 @@ immunity <- function(acquired_immunity, maternal_immunity, parameters) {
 
 # Unique biting rate (psi) for a human of a given age
 unique_biting_rate <- function(age, parameters) {
-  return 1 - parameters$rho * exp(- age / a0)
+  1 - parameters$rho * exp(- age / a0)
 }
 
 # Relative biting rate (xi) drawn from log normal
 relative_biting_rate <- function(n, parameters) {
-  return rlnorm(n, -parameters$sigma**2/2,parameters$sigma**2)
+  rlnorm(n, -parameters$sigma**2/2,parameters$sigma**2)
 }
 
 infection_probability <- function(ib, parameters) {
-  return parameters$b0 + (parameters$b1 - parameters$b0) /
+  parameters$b0 + (parameters$b1 - parameters$b0) /
     (1 + (ib / parameters$ib0)**parameters$kb)
 }
 
@@ -91,11 +91,11 @@ mosquito_force_of_infection <- function(v, age, state, xi, parameters) {
   )
 
   mean_infectivity <- sum(human_frame$pi * human_frame$infectivity)
-  return blood_meal_rate(v, parameters) * mean_infectivity
+  blood_meal_rate(v, parameters) * mean_infectivity
 }
 
 blood_meal_rate <- function(v, parameters) {
-  return recode(
+  recode(
     v,
     `1`=parameters$av1,
     `2`=parameters$av2,

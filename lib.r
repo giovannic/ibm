@@ -20,7 +20,7 @@ create_interval_updater <- function(updater, interval) {
 }
 
 create_dummy_updater <- function() {
-  list(updater=function() {}, interval=1000000)
+  list(updater=function() {}, interval=1000000) #TODO: must be a better solution
 }
 
 create_constant <- function(individual, name, initial) {
@@ -31,12 +31,12 @@ create_state <- function(individual, name, initial) {
   list(individual=individual, name=name, initial=initial)
 }
 
-create_state_change_process <- function(from, to, rate) {
-  list(from=from, to=to, rate=rate)
-}
-
-create_fixed_probability_state_change_process <- function(from, to, rate) {
-  create_state_change_process(from, to, fixed_probability(rate))
+create_fixed_probability_state_change_process <- function(i, from, to, rate) {
+  source_individuals <- which(individual$get_state() == from$get_name())
+  target_individuals <- source_individuals[
+    runif(length(source_individuals), 0, 1) > rate
+  ]
+  updates <- list(states=list(to, target_individuals))
 }
 
 create_process <- function(f) {
@@ -45,23 +45,30 @@ create_process <- function(f) {
 
 simulate <- function(
   individuals,
-  states,
-  constants,
-  variables,
   processes,
   end_time
   ) {
-  #Initialise simulation frames
+  # Initialise individuals
   for (i in individuals) {
+    i$initialise()
   }
-}
 
-# =======
-# Utility
-# =======
-fixed_probability <- function(p) {
-  function(source_humans, timestep) {
-    random <- runif(length(source_humans), 0, 1)
-    random > p
+  # Main loop
+  simulation_frames <- list()
+  timesteps <- 1:end_time
+  for (timestep in timesteps) {
+    for (i in individuals) {
+      i$step_variables(timestep)
+    }
+    for (p in processes) {
+      p$step(timestep)
+    }
+    frames <- list()
+    for (i in individuals) {
+      append(frames, i$render_simulation_frame())
+    }
+    append(simulation_frames, frames)
   }
+
+  return simulation_frames
 }

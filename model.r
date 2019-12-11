@@ -7,40 +7,41 @@ human_population <- 100 * 1000
 mosquito_population <- 100 * human_population
 human    <- create_individual('human', human_population)
 mosquito <- create_individual('mosquito', mosquito_population)
-timestep_to_day <- 1
 
 # Define states
-S       <- create_state(human, "S", human_population)
-I       <- create_state(human, "I", 0)
-Treated <- create_state(human, "T", 0)
-D       <- create_state(human, "D", 0)
-A       <- create_state(human, "A", 0)
-U       <- create_state(human, "U", 0)
+S       <- create_state("S", human_population)
+I       <- create_state("I", 0)
+Treated <- create_state("T", 0)
+D       <- create_state("D", 0)
+A       <- create_state("A", 0)
+U       <- create_state("U", 0)
 # Mosquito states
-E       <- create_state(mosquito, "E", mosquito_population)
-L       <- create_state(mosquito, "L", 0)
-P       <- create_state(mosquito, "P", 0)
-Sm      <- create_state(mosquito, "Sm", 0)
-Im      <- create_state(mosquito, "Im", 0)
+E       <- create_state("E", mosquito_population)
+L       <- create_state("L", 0)
+P       <- create_state("P", 0)
+Sm      <- create_state("Sm", 0)
+Im      <- create_state("Im", 0)
 
-states <- c(
-  # Human
+human$register_states(list(
   S,
   I,
   Treated,
   D,
   A,
-  U,
+  U
+))
+
+mosquito$register_states(list(
   # Mosquito
   E,
   L,
   P,
   Sm,
   Im
-)
-
+))
 
 # Define parameters
+timestep_to_day <- 1
 parameters = list(
   b0    = 0.590076,
   b1    = 0.5,
@@ -67,9 +68,8 @@ parameters = list(
 
 # Define variables
 age <- create_variable(
-  human,
   "age",
-  function() { rexp(human_population, rate=1/10) %>% trunc },
+  function(size) { rexp(size, rate=1/10) %>% trunc },
   create_interval_updater(
     function(a, timestep) { a+1 },
     365*timestep_to_day
@@ -77,24 +77,21 @@ age <- create_variable(
 )
 
 last_bitten <- create_variable(
-  human,
   "last_bitten",
-  function() { rep(-1, human_population) },
+  function(size) { rep(-1, size) },
   create_dummy_updater() #Updated by mosquito biting process
 )
 
 last_infected <- create_variable(
-  human,
   "last_infected"
-  function() { rep(-1, human_population) },
+  function(size) { rep(-1, size) },
   create_dummy_updater() #Updated by mosquito biting process
 )
 
 # Maternal immunity
 icm <- create_variable(
-  human,
   "ICM",
-  function() {
+  function(size) {
     first_immunity <- 1 # NOTE: how do we initialise this?
     t <- age$get_value() * 365 * timestep_to_day
     first_immunity * exp(-(t * parameters$rm))
@@ -108,9 +105,8 @@ icm <- create_variable(
 
 # Pre-erythoctic immunity
 ib  <- create_variable(
-  human,
   "IB",
-  function() { rep(0, human_population) },
+  function(size) { rep(0, size) },
   create_updater(
     function(i, timestep) {
       immunity_decay(
@@ -126,9 +122,8 @@ ib  <- create_variable(
 
  # Acquired immunity to severe disease
 ica <- create_variable(
-  human,
   "ICA",
-  function() { rep(0, human_population) },
+  function(size) { rep(0, size) },
   create_updater(
     function(i, timestep) {
       immunity_decay(
@@ -142,10 +137,10 @@ ica <- create_variable(
   )
 )
 
-variables = c(age, last_bitten, last_infected, ib, ica, icm)
+human$register_variables(list(age, last_bitten, last_infected, ib, ica, icm))
 
+# Define constant
 xi <- create_constant(
-  human,
   "xi",
   function(n, parameters) {
     rlnorm(n, -parameters$sigma**2/2,parameters$sigma**2)
@@ -153,7 +148,6 @@ xi <- create_constant(
 )
 
 mosquito_variety <- create_constant(
-  mosquito,
   "variety",
   function() {
     p <- runif(mosquito_population)
@@ -165,7 +159,8 @@ mosquito_variety <- create_constant(
   }
 )
 
-constants = c(xi, mosquito_variety)
+human$register_constants(list(xi,))
+mosquito$register_constants(list(mosquito_variety,))
 
 infection_function <- function(timestep) {
   source_humans <- which(human$get_state() %in% c('S', 'U', 'A'))
@@ -193,18 +188,12 @@ infection_function <- function(timestep) {
   # NOTE: clean this up
   list(
     states=list(
-      I=infected_humans[symptomatic],
-      A=infected_humans[!symptomatic]
+      list(I, infected_humans[symptomatic]),
+      list(A, infected_humans[!symptomatic])
     ),
     variables=list(
-      last_bitten=list(
-        index=infected_humans,
-        value=timestep
-      )
-      last_infected=list(
-        index=infected_humans[symptomatic],
-        value=timestep
-      )
+      list(last_bitten, infected_humans, timestep),
+      list(last_infected, infected_humans[symptomatic], timestep)
     )
   )
 }
@@ -223,7 +212,7 @@ mosquito_infection_function <- function(timestep) {
   ]
   list(
     states=list(
-      Im=infected,
+      list(Im, infected)
     )
   )
 }
@@ -235,28 +224,28 @@ processes <- c(
   # ===============
 
   # Untreated Progression
-  create_fixed_probability_state_change_process(I, D, 1 - ft),
+  create_fixed_probability_state_change_process(human, I, D, 1 - parameters$ft),
   # Treatment
-  create_fixed_probability_state_change_process(I, Treated, ft),
+  create_fixed_probability_state_change_process(human, I, Treated, parameters$ft),
   # Asymptomatic Progression
-  create_fixed_probability_state_change_process(D, A, rd),
+  create_fixed_probability_state_change_process(human, D, A, parameters$rd),
   # Subpatient Progression
-  create_fixed_probability_state_change_process(A, U, ra),
+  create_fixed_probability_state_change_process(human, A, U, parameters$ra),
   # Subpatient Recovery
-  create_fixed_probability_state_change_process(U, S, ru),
+  create_fixed_probability_state_change_process(human, U, S, parameters$ru),
   # Treatment Recovery
-  create_fixed_probability_state_change_process(Treated, S, rt),
+  create_fixed_probability_state_change_process(human, Treated, S, parameters$rt),
 
   # ==================
   # Mosquito Processes
   # ==================
 
   # Larval growth
-  create_fixed_probability_state_change_process(E, L, rel),
+  create_fixed_probability_state_change_process(mosquito, E, L, parameters$rel),
   # Pupal stage
-  create_fixed_probability_state_change_process(L, P, rl),
+  create_fixed_probability_state_change_process(mosquito, L, P, parameters$rl),
   # Susceptable Female Development
-  create_fixed_probability_state_change_process(P, Sm, rpl),
+  create_fixed_probability_state_change_process(mosquito, P, Sm, parameters$rpl),
   # Mosquito Infection
   # Mosquitos move from Sm -> Im
   # NOTE: Is this not meant to happen in the infection function?
@@ -272,9 +261,6 @@ processes <- c(
 
 simulation <- simulate(
   individuals,
-  states,
-  constants,
-  variables,
   processes,
   365*10 # 10 years
 )
